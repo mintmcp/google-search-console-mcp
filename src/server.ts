@@ -618,6 +618,8 @@ server.registerTool(
           pageFetchState: z.string().optional(),
           robotsTxtState: z.string().optional(),
           indexingState: z.string().optional(),
+          referringUrls: z.array(z.string()).optional(),
+          sitemap: z.array(z.string()).optional(),
         }).optional(),
         mobileUsabilityResult: z.object({
           verdict: z.string(),
@@ -632,17 +634,20 @@ server.registerTool(
   async ({ siteUrl, inspectionUrl }) => {
     const data = await inspectUrl(siteUrl, inspectionUrl);
 
+    const idx = data.inspectionResult?.indexStatusResult;
     const output = {
       inspectionResult: {
-        indexStatusResult: data.inspectionResult?.indexStatusResult
+        indexStatusResult: idx
           ? {
-              verdict: data.inspectionResult.indexStatusResult.verdict ?? "UNKNOWN",
-              coverageState: data.inspectionResult.indexStatusResult.coverageState ?? "UNKNOWN",
-              crawledAs: data.inspectionResult.indexStatusResult.crawledAs ?? undefined,
-              lastCrawlTime: data.inspectionResult.indexStatusResult.lastCrawlTime ?? undefined,
-              pageFetchState: data.inspectionResult.indexStatusResult.pageFetchState ?? undefined,
-              robotsTxtState: data.inspectionResult.indexStatusResult.robotsTxtState ?? undefined,
-              indexingState: data.inspectionResult.indexStatusResult.indexingState ?? undefined,
+              verdict: idx.verdict ?? "UNKNOWN",
+              coverageState: idx.coverageState ?? "UNKNOWN",
+              crawledAs: idx.crawledAs ?? undefined,
+              lastCrawlTime: idx.lastCrawlTime ?? undefined,
+              pageFetchState: idx.pageFetchState ?? undefined,
+              robotsTxtState: idx.robotsTxtState ?? undefined,
+              indexingState: idx.indexingState ?? undefined,
+              referringUrls: idx.referringUrls ?? undefined,
+              sitemap: idx.sitemap ?? undefined,
             }
           : undefined,
         mobileUsabilityResult: data.inspectionResult?.mobileUsabilityResult
