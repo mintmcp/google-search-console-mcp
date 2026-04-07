@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:suganthan.com)",
+      "Read(//Users/bo/.claude/skills/**)",
+      "Read(//Users/bo/.claude/**)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
