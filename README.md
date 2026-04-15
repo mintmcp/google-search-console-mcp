@@ -16,7 +16,7 @@ Enable both APIs in your Google Cloud project:
 1. Go to **APIs & Services > Credentials**
 2. Click **Create Credentials > OAuth client ID**
 3. Select **Web application**
-4. Add your redirect URI
+4. Add your redirect URI. If deploying on MintMCP, this is `https://app.mintmcp.com/oauth/callback`. For other hosts, use the callback URL the platform provides.
 5. Save the **Client ID** and **Client Secret**
 
 ### 3. Configure OAuth Consent Screen
@@ -70,6 +70,36 @@ The `access_type=offline` parameter is required to obtain a refresh token so the
 ### Sitemaps
 - **list_sitemaps** — List all submitted sitemaps
 - **submit_sitemap** — Submit a new sitemap
+
+## Deploying on MintMCP
+
+Three settings in MintMCP's Hosted OAuth config trip people up. All three need to be set before the consent screen will appear.
+
+**1. Redirect URI (in Google Cloud Console, not MintMCP)**
+
+```
+https://app.mintmcp.com/oauth/callback
+```
+
+Paste that into your Google OAuth client under **Authorized redirect URIs**.
+
+**2. Scopes (MintMCP Hosted OAuth → Scopes field, comma-separated)**
+
+Google requires fully qualified scope URIs. Short names (`webmasters`, `indexing`) are rejected.
+
+```
+https://www.googleapis.com/auth/webmasters,https://www.googleapis.com/auth/indexing
+```
+
+**3. Header mapping (MintMCP Hosted OAuth → Header mappings)**
+
+Map the OAuth `access_token` response field to an outbound `Authorization` header with a `Bearer ` prefix (trailing space). This is what gets the token to the server on each request.
+
+| Field | Header | Prefix |
+|---|---|---|
+| `access_token` | `Authorization` | `Bearer ` |
+
+Save, then click **Continue with OAuth** on the Installation tab to complete the flow.
 
 ## Development
 
