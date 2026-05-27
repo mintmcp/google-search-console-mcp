@@ -13,18 +13,6 @@ import {
   listSites,
 } from "./gsc-client.js";
 
-const server = new McpServer(
-  { name: "google-search-console", version: "0.1.0" },
-  {
-    instructions: [
-      "Google Search Console MCP server. All tools require a siteUrl — use list_sites to discover available properties.",
-      "Site URLs use the format 'sc-domain:example.com' for domain properties or 'https://example.com/' for URL-prefix properties.",
-      "Date ranges should use YYYY-MM-DD format. GSC data is typically available with a 2-3 day delay.",
-      "Use search_analytics for raw data queries. Use the analysis tools (quick_wins, content_gaps, etc.) for pre-built insights.",
-    ].join("\n"),
-  },
-);
-
 // ── Helper schemas ────────────────────────────────────────────────
 
 const siteUrlSchema = z.string().describe(
@@ -39,10 +27,25 @@ const dimensionFilterSchema = z.object({
   expression: z.string().describe("Filter value or regex pattern."),
 });
 
-// ── list_sites ────────────────────────────────────────────────────
+// ── Server factory ────────────────────────────────────────────────
 
-server.registerTool(
-  "list_sites",
+function createServer(): McpServer {
+  const server = new McpServer(
+    { name: "google-search-console", version: "0.1.0" },
+    {
+      instructions: [
+        "Google Search Console MCP server. All tools require a siteUrl — use list_sites to discover available properties.",
+        "Site URLs use the format 'sc-domain:example.com' for domain properties or 'https://example.com/' for URL-prefix properties.",
+        "Date ranges should use YYYY-MM-DD format. GSC data is typically available with a 2-3 day delay.",
+        "Use search_analytics for raw data queries. Use the analysis tools (quick_wins, content_gaps, etc.) for pre-built insights.",
+      ].join("\n"),
+    },
+  );
+
+  // ── list_sites ────────────────────────────────────────────────────
+
+  server.registerTool(
+    "list_sites",
   {
     description:
       "List all Search Console properties the authenticated user has access to. Call this first to discover valid siteUrl values for other tools.",
@@ -85,9 +88,9 @@ server.registerTool(
         .describe("Dimensions to group results by. Common: ['query'], ['page'], ['query','page'], ['date']."),
       filters: z.array(dimensionFilterSchema).optional()
         .describe("Optional filters to narrow results. Example: filter by country='usa' or page containing '/blog/'."),
-      rowLimit: z.number().int().min(1).max(25000).default(1000)
+      rowLimit: z.coerce.number().int().min(1).max(25000).default(1000)
         .describe("Max rows to return. Hard cap 25000."),
-      startRow: z.number().int().min(0).default(0)
+      startRow: z.coerce.number().int().min(0).default(0)
         .describe("Pagination offset. Use with rowLimit to page through results."),
       type: z.enum(["web", "image", "video", "news", "discover", "googleNews"]).default("web")
         .describe("Search type to query."),
@@ -212,7 +215,7 @@ server.registerTool(
       siteUrl: siteUrlSchema,
       startDate: dateSchema,
       endDate: dateSchema,
-      minImpressions: z.number().int().min(0).default(100)
+      minImpressions: z.coerce.number().int().min(0).default(100)
         .describe("Minimum impressions threshold. Lower for low-traffic sites."),
     },
     outputSchema: {
@@ -271,9 +274,9 @@ server.registerTool(
       siteUrl: siteUrlSchema,
       startDate: dateSchema,
       endDate: dateSchema,
-      maxCtr: z.number().min(0).max(1).default(0.02)
+      maxCtr: z.coerce.number().min(0).max(1).default(0.02)
         .describe("Max CTR threshold. Queries below this are considered gaps. Default 2%."),
-      minImpressions: z.number().int().min(0).default(200)
+      minImpressions: z.coerce.number().int().min(0).default(200)
         .describe("Minimum impressions to filter noise."),
     },
     outputSchema: {
@@ -329,7 +332,7 @@ server.registerTool(
       currentEndDate: dateSchema.describe("End of the current/recent period."),
       previousStartDate: dateSchema.describe("Start of the comparison period (should be same duration)."),
       previousEndDate: dateSchema.describe("End of the comparison period."),
-      minPreviousClicks: z.number().int().min(0).default(10)
+      minPreviousClicks: z.coerce.number().int().min(0).default(10)
         .describe("Minimum clicks in the previous period to filter noise."),
     },
     outputSchema: {
@@ -391,7 +394,7 @@ server.registerTool(
       siteUrl: siteUrlSchema,
       startDate: dateSchema,
       endDate: dateSchema,
-      minImpressions: z.number().int().min(0).default(500)
+      minImpressions: z.coerce.number().int().min(0).default(500)
         .describe("Minimum impressions threshold."),
     },
     outputSchema: {
@@ -467,7 +470,7 @@ server.registerTool(
       siteUrl: siteUrlSchema,
       startDate: dateSchema,
       endDate: dateSchema,
-      minImpressions: z.number().int().min(0).default(50)
+      minImpressions: z.coerce.number().int().min(0).default(50)
         .describe("Minimum impressions per query-page pair to include."),
     },
     outputSchema: {
@@ -541,7 +544,7 @@ server.registerTool(
       siteUrl: siteUrlSchema,
       startDate: dateSchema.describe("Start of the analysis window (use a range of at least 60 days for meaningful results)."),
       endDate: dateSchema.describe("End of the analysis window."),
-      minClicks: z.number().int().min(0).default(20)
+      minClicks: z.coerce.number().int().min(0).default(20)
         .describe("Minimum clicks in the first half to filter noise."),
     },
     outputSchema: {
@@ -683,7 +686,7 @@ server.registerTool(
       url: z.string(),
       type: z.string(),
     },
-    annotations: { openWorldHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   },
   async ({ url, type }) => {
     await submitUrlForIndexing(url, type);
@@ -720,7 +723,7 @@ server.registerTool(
         failed: z.number(),
       }),
     },
-    annotations: { openWorldHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   },
   async ({ urls, type }) => {
     const results = await batchSubmitUrls(urls, type);
@@ -793,7 +796,7 @@ server.registerTool(
       siteUrl: z.string(),
       feedpath: z.string(),
     },
-    annotations: { openWorldHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   },
   async ({ siteUrl, feedpath }) => {
     const output = await submitSitemap(siteUrl, feedpath);
@@ -815,7 +818,7 @@ server.registerTool(
       siteUrl: siteUrlSchema,
       startDate: dateSchema,
       endDate: dateSchema,
-      topN: z.number().int().min(1).max(100).default(20)
+      topN: z.coerce.number().int().min(1).max(100).default(20)
         .describe("Number of top queries/pages to include."),
     },
     outputSchema: {
@@ -867,10 +870,13 @@ server.registerTool(
   },
 );
 
+  return server;
+}
+
 // ── HTTP Transport ────────────────────────────────────────────────
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", server: "google-search-console", version: "0.1.0" });
@@ -878,14 +884,17 @@ app.get("/health", (_req, res) => {
 
 app.post("/mcp", async (req, res) => {
   try {
-    // Extract access token from headers or env
+    // Extract the OAuth access token solely from the Authorization: Bearer header.
     const authHeader = req.headers["authorization"];
     const accessToken =
-      (req.headers["x-gsc-access-token"] as string) ??
-      (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined) ??
-      process.env.GSC_ACCESS_TOKEN ??
-      "";
+      authHeader && authHeader.toLowerCase().startsWith("bearer ")
+        ? authHeader.slice(7)
+        : "";
 
+    // Create a fresh server + transport per request for concurrency safety:
+    // Protocol stores a single transport, so a shared server would cross-wire
+    // responses under concurrent requests (stateless per-request pattern).
+    const server = createServer();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless
     });
@@ -901,14 +910,14 @@ app.post("/mcp", async (req, res) => {
     if (!res.headersSent) {
       res.status(500).json({
         jsonrpc: "2.0",
-        error: { code: -32603, message: "Internal server error" },
+        error: { code: -32603, message: err instanceof Error ? err.message : "Internal server error" },
         id: null,
       });
     }
   }
 });
 
-const PORT = process.env.PORT ?? 8000;
-app.listen(Number(PORT), "0.0.0.0", () => {
+const PORT = 8000;
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`GSC MCP server listening on 0.0.0.0:${PORT}`);
 });

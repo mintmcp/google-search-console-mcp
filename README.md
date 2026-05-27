@@ -94,8 +94,4 @@ docker run -p 8000:8000 gsc-mcp
 
 ## Authentication
 
-The server extracts the OAuth access token from requests in this order:
-
-1. `x-gsc-access-token` header
-2. `Authorization: Bearer <token>` header
-3. `GSC_ACCESS_TOKEN` environment variable
+The server reads the Google OAuth access token solely from the per-request `Authorization: Bearer <token>` header, which MintMCP injects on a per-user basis. No shared environment-variable token is used, so each request runs against its own user's Google credentials.

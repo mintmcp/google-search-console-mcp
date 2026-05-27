@@ -12,7 +12,7 @@ function getContext(): RequestContext {
   const ctx = requestContext.getStore();
   if (!ctx || !ctx.accessToken) {
     throw new Error(
-      "No access token found. Configure GSC_ACCESS_TOKEN in your MintMCP connection settings.",
+      "No access token found. Provide your Google OAuth access token via the 'Authorization: Bearer <token>' header.",
     );
   }
   return ctx;
@@ -23,6 +23,55 @@ function getSearchConsole(): searchconsole_v1.Searchconsole {
   const auth = new google.auth.OAuth2();
   auth.setCredentials({ access_token: accessToken });
   return google.searchconsole({ version: "v1", auth });
+}
+
+// ── Error formatting ──────────────────────────────────────────────
+
+export function formatGoogleApiError(err: unknown): string {
+  const e = err as {
+    response?: { data?: { error?: { message?: unknown } }; status?: unknown };
+    code?: unknown;
+    errors?: unknown;
+    message?: unknown;
+  };
+
+  const parts: string[] = [];
+
+  const status = e?.response?.status ?? e?.code;
+  if (status !== undefined && status !== null) {
+    parts.push(`HTTP ${String(status)}`);
+  }
+
+  const apiMessage = e?.response?.data?.error?.message;
+  if (typeof apiMessage === "string" && apiMessage.length > 0) {
+    parts.push(apiMessage);
+  }
+
+  if (Array.isArray(e?.errors)) {
+    const details = e.errors
+      .map((entry) => {
+        const item = entry as { message?: unknown; reason?: unknown };
+        const msg = typeof item?.message === "string" ? item.message : undefined;
+        const reason = typeof item?.reason === "string" ? item.reason : undefined;
+        if (msg && reason) return `${msg} (${reason})`;
+        return msg ?? reason;
+      })
+      .filter((d): d is string => typeof d === "string" && d.length > 0);
+    if (details.length > 0) parts.push(details.join("; "));
+  }
+
+  if (parts.length > 0) return parts.join(": ");
+
+  if (typeof e?.message === "string" && e.message.length > 0) return e.message;
+  return String(err);
+}
+
+async function callGoogle<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err: unknown) {
+    throw new Error(formatGoogleApiError(err));
+  }
 }
 
 // ── Search Analytics ──────────────────────────────────────────────
@@ -42,20 +91,22 @@ export interface SearchAnalyticsParams {
 
 export async function querySearchAnalytics(params: SearchAnalyticsParams) {
   const sc = getSearchConsole();
-  const res = await sc.searchanalytics.query({
-    siteUrl: params.siteUrl,
-    requestBody: {
-      startDate: params.startDate,
-      endDate: params.endDate,
-      dimensions: params.dimensions,
-      dimensionFilterGroups: params.dimensionFilterGroups,
-      rowLimit: params.rowLimit ?? 1000,
-      startRow: params.startRow ?? 0,
-      type: params.type ?? "web",
-      aggregationType: params.aggregationType,
-      dataState: params.dataState ?? "final",
-    },
-  });
+  const res = await callGoogle(() =>
+    sc.searchanalytics.query({
+      siteUrl: params.siteUrl,
+      requestBody: {
+        startDate: params.startDate,
+        endDate: params.endDate,
+        dimensions: params.dimensions,
+        dimensionFilterGroups: params.dimensionFilterGroups,
+        rowLimit: params.rowLimit ?? 1000,
+        startRow: params.startRow ?? 0,
+        type: params.type ?? "web",
+        aggregationType: params.aggregationType,
+        dataState: params.dataState ?? "final",
+      },
+    }),
+  );
   return res.data;
 }
 
@@ -63,12 +114,14 @@ export async function querySearchAnalytics(params: SearchAnalyticsParams) {
 
 export async function inspectUrl(siteUrl: string, inspectionUrl: string) {
   const sc = getSearchConsole();
-  const res = await sc.urlInspection.index.inspect({
-    requestBody: {
-      inspectionUrl,
-      siteUrl,
-    },
-  });
+  const res = await callGoogle(() =>
+    sc.urlInspection.index.inspect({
+      requestBody: {
+        inspectionUrl,
+        siteUrl,
+      },
+    }),
+  );
   return res.data;
 }
 
@@ -76,13 +129,13 @@ export async function inspectUrl(siteUrl: string, inspectionUrl: string) {
 
 export async function listSitemaps(siteUrl: string) {
   const sc = getSearchConsole();
-  const res = await sc.sitemaps.list({ siteUrl });
+  const res = await callGoogle(() => sc.sitemaps.list({ siteUrl }));
   return res.data;
 }
 
 export async function submitSitemap(siteUrl: string, feedpath: string) {
   const sc = getSearchConsole();
-  await sc.sitemaps.submit({ siteUrl, feedpath });
+  await callGoogle(() => sc.sitemaps.submit({ siteUrl, feedpath }));
   return { status: "success", siteUrl, feedpath };
 }
 
@@ -93,9 +146,11 @@ export async function submitUrlForIndexing(url: string, type: "URL_UPDATED" | "U
   const auth = new google.auth.OAuth2();
   auth.setCredentials({ access_token: accessToken });
   const indexing = google.indexing({ version: "v3", auth });
-  const res = await indexing.urlNotifications.publish({
-    requestBody: { url, type },
-  });
+  const res = await callGoogle(() =>
+    indexing.urlNotifications.publish({
+      requestBody: { url, type },
+    }),
+  );
   return res.data;
 }
 
@@ -117,6 +172,6 @@ export async function batchSubmitUrls(urls: string[], type: "URL_UPDATED" | "URL
 
 export async function listSites() {
   const sc = getSearchConsole();
-  const res = await sc.sites.list();
+  const res = await callGoogle(() => sc.sites.list());
   return res.data;
 }
