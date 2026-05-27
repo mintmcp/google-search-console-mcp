@@ -21,7 +21,13 @@ const siteUrlSchema = z.string().describe(
 
 const dateSchema = z.string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine((s) => !Number.isNaN(new Date(s).getTime()), "Not a valid calendar date.")
+  .refine((s) => {
+    // Reject overflow dates: new Date("2026-02-31") normalizes to Mar 3 rather
+    // than failing, so verify the components round-trip exactly (UTC).
+    const [y, m, d] = s.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+  }, "Not a valid calendar date.")
   .describe("Date in YYYY-MM-DD format.");
 
 const dimensionFilterSchema = z.object({
