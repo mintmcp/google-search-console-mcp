@@ -18,11 +18,15 @@ function getContext(): RequestContext {
   return ctx;
 }
 
-function getSearchConsole(): searchconsole_v1.Searchconsole {
+function getAuth(): InstanceType<typeof google.auth.OAuth2> {
   const { accessToken } = getContext();
   const auth = new google.auth.OAuth2();
   auth.setCredentials({ access_token: accessToken });
-  return google.searchconsole({ version: "v1", auth });
+  return auth;
+}
+
+function getSearchConsole(): searchconsole_v1.Searchconsole {
+  return google.searchconsole({ version: "v1", auth: getAuth() });
 }
 
 // ── Error formatting ──────────────────────────────────────────────
@@ -156,10 +160,7 @@ export async function submitSitemap(siteUrl: string, feedpath: string) {
 // ── Indexing API ──────────────────────────────────────────────────
 
 export async function submitUrlForIndexing(url: string, type: "URL_UPDATED" | "URL_DELETED") {
-  const { accessToken } = getContext();
-  const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: accessToken });
-  const indexing = google.indexing({ version: "v3", auth });
+  const indexing = google.indexing({ version: "v3", auth: getAuth() });
   const res = await callGoogle(() =>
     indexing.urlNotifications.publish({
       requestBody: { url, type },
@@ -176,6 +177,7 @@ export async function batchSubmitUrls(urls: string[], type: "URL_UPDATED" | "URL
       results.push({ url, status: "success" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      console.error(`batch_submit: failed to submit ${url}:`, msg);
       results.push({ url, status: "error", error: msg });
     }
   }

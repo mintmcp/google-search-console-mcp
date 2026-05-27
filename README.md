@@ -40,7 +40,7 @@ https://www.googleapis.com/auth/indexing
 | Authorization URL | `https://accounts.google.com/o/oauth2/v2/auth?access_type=offline&prompt=consent` |
 | Token URL | `https://oauth2.googleapis.com/token` |
 
-The `access_type=offline` parameter is required to obtain a refresh token so the server can refresh expired access tokens automatically.
+The `access_type=offline` parameter is required to obtain a refresh token. MintMCP stores it and refreshes the access token automatically, injecting a fresh token into each request's `Authorization: Bearer` header. The MCP server itself does not refresh tokens — it only uses the per-request access token it receives.
 
 ## Tools
 
