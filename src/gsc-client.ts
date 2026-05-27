@@ -30,6 +30,7 @@ function getSearchConsole(): searchconsole_v1.Searchconsole {
 export function formatGoogleApiError(err: unknown): string {
   const e = err as {
     response?: { data?: { error?: { message?: unknown } }; status?: unknown };
+    status?: unknown;
     code?: unknown;
     errors?: unknown;
     message?: unknown;
@@ -37,9 +38,22 @@ export function formatGoogleApiError(err: unknown): string {
 
   const parts: string[] = [];
 
-  const status = e?.response?.status ?? e?.code;
-  if (status !== undefined && status !== null) {
-    parts.push(`HTTP ${String(status)}`);
+  // HTTP status only from numeric status fields. gaxios `code` may be a network
+  // error code (e.g. ECONNRESET, ENOTFOUND), which is not an HTTP status.
+  const httpStatus =
+    typeof e?.response?.status === "number"
+      ? e.response.status
+      : typeof e?.status === "number"
+        ? e.status
+        : typeof e?.code === "number"
+          ? e.code
+          : undefined;
+  if (httpStatus !== undefined) {
+    parts.push(`HTTP ${httpStatus}`);
+  }
+
+  if (typeof e?.code === "string" && e.code.length > 0 && e.code !== String(httpStatus)) {
+    parts.push(e.code);
   }
 
   const apiMessage = e?.response?.data?.error?.message;

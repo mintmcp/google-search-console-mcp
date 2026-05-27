@@ -917,6 +917,33 @@ app.post("/mcp", async (req, res) => {
   }
 });
 
+// Stateless transport: GET (SSE) and DELETE (session teardown) are unused.
+// Return a JSON-RPC 405 rather than Express's default HTML 404.
+const methodNotAllowed = (_req: express.Request, res: express.Response) => {
+  res.status(405).json({
+    jsonrpc: "2.0",
+    error: { code: -32000, message: "Method not allowed." },
+    id: null,
+  });
+};
+app.get("/mcp", methodNotAllowed);
+app.delete("/mcp", methodNotAllowed);
+
+// Translate body-parser failures (malformed JSON, payload too large) into a
+// JSON-RPC error envelope instead of Express's default HTML response.
+app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err && req.path === "/mcp" && !res.headersSent) {
+    const status = (err as { status?: number }).status ?? 400;
+    res.status(status).json({
+      jsonrpc: "2.0",
+      error: { code: -32700, message: err instanceof Error ? err.message : "Invalid request body." },
+      id: null,
+    });
+    return;
+  }
+  next(err);
+});
+
 const PORT = 8000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`GSC MCP server listening on 0.0.0.0:${PORT}`);
