@@ -42,8 +42,7 @@ export function formatGoogleApiError(err: unknown): string {
 
   const parts: string[] = [];
 
-  // HTTP status only from numeric status fields. gaxios `code` may be a network
-  // error code (e.g. ECONNRESET, ENOTFOUND), which is not an HTTP status.
+  // Numeric status fields only; gaxios `code` can be a network code (ECONNRESET), not an HTTP status.
   const httpStatus =
     typeof e?.response?.status === "number"
       ? e.response.status

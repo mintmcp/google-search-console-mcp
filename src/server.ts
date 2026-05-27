@@ -22,8 +22,7 @@ const siteUrlSchema = z.string().describe(
 const dateSchema = z.string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .refine((s) => {
-    // Reject overflow dates: new Date("2026-02-31") normalizes to Mar 3 rather
-    // than failing, so verify the components round-trip exactly (UTC).
+    // new Date("2026-02-31") rolls over to Mar 3 instead of failing; require an exact UTC round-trip.
     const [y, m, d] = s.split("-").map(Number);
     const dt = new Date(Date.UTC(y, m - 1, d));
     return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
@@ -893,16 +892,15 @@ app.get("/health", (_req, res) => {
 
 app.post("/mcp", async (req, res) => {
   try {
-    // Extract the OAuth access token solely from the Authorization: Bearer header.
+    // Access token from the Authorization: Bearer header, per request.
     const authHeader = req.headers["authorization"];
     const accessToken =
       authHeader && authHeader.toLowerCase().startsWith("bearer ")
         ? authHeader.slice(7).trim()
         : "";
 
-    // Create a fresh server + transport per request for concurrency safety:
-    // Protocol stores a single transport, so a shared server would cross-wire
-    // responses under concurrent requests (stateless per-request pattern).
+    // Fresh server + transport per request: Protocol holds a single transport
+    // ref, so a shared server cross-wires responses under concurrent requests.
     const server = createServer();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless
@@ -919,9 +917,8 @@ app.post("/mcp", async (req, res) => {
       await transport.handleRequest(req, res, req.body);
     });
   } catch (err) {
-    // Logged server-side; the client gets a generic message so internal
-    // transport/setup error detail isn't disclosed. Actionable upstream
-    // (Google API) errors are already surfaced as tool isError results.
+    // Generic message to the client; detail is logged server-side. Google API
+    // errors are surfaced separately as tool isError results.
     console.error("MCP request error:", err);
     if (!res.headersSent) {
       res.status(500).json({
@@ -933,8 +930,7 @@ app.post("/mcp", async (req, res) => {
   }
 });
 
-// Stateless transport: GET (SSE) and DELETE (session teardown) are unused.
-// Return a JSON-RPC 405 rather than Express's default HTML 404.
+// Stateless transport: GET/DELETE are unused. Return JSON-RPC 405, not Express's 404.
 const methodNotAllowed = (_req: express.Request, res: express.Response) => {
   res.status(405).json({
     jsonrpc: "2.0",
@@ -945,8 +941,7 @@ const methodNotAllowed = (_req: express.Request, res: express.Response) => {
 app.get("/mcp", methodNotAllowed);
 app.delete("/mcp", methodNotAllowed);
 
-// Translate body-parser failures (malformed JSON, payload too large) into a
-// JSON-RPC error envelope instead of Express's default HTML response.
+// Body-parser failures (bad JSON, too large) → JSON-RPC error, not Express's default HTML.
 app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (err && req.path === "/mcp" && !res.headersSent) {
     const status = (err as { status?: number }).status ?? 400;
@@ -960,8 +955,7 @@ app.use((err: unknown, req: express.Request, res: express.Response, next: expres
   next(err);
 });
 
-// Honor the platform-injected PORT (MintMCP's runtime maps and sets it),
-// defaulting to 8000 for local/standalone use.
+// MintMCP's runtime sets PORT and maps it; fall back to 8000 standalone.
 const PORT = Number(process.env.PORT) || 8000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`GSC MCP server listening on 0.0.0.0:${PORT}`);
