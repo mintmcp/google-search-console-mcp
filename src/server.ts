@@ -960,7 +960,9 @@ app.use((err: unknown, req: express.Request, res: express.Response, next: expres
   next(err);
 });
 
-const PORT = 8000;
+// Honor the platform-injected PORT (MintMCP's runtime maps and sets it),
+// defaulting to 8000 for local/standalone use.
+const PORT = Number(process.env.PORT) || 8000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`GSC MCP server listening on 0.0.0.0:${PORT}`);
 });
