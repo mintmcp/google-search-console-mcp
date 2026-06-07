@@ -13,4 +13,5 @@ COPY --from=build /app/package-lock.json ./
 RUN npm ci --ignore-scripts --omit=dev && \
     npm cache clean --force
 EXPOSE 8000
+USER node
 CMD ["node", "dist/server.js"]

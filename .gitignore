@@ -1,3 +1,6 @@
 node_modules
 dist
 *.js.map
+.claude/dev-loop-state.json
+.claude/dev-loop.log.md
+.claude/dev-loop-plan.md
